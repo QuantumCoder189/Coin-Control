@@ -1,0 +1,21 @@
+{
+  "name": "coin-control",
+  "version": "1.0.0",
+  "description": "Teen budget app — manage money with style",
+  "main": "index.html",
+  "scripts": {
+    "build:android": "npx cap add android && npx cap sync android && npx cap open android",
+    "build:ios": "npx cap add ios && npx cap sync ios && npx cap open ios",
+    "sync": "npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/core": "^5.0.0",
+    "@capacitor/android": "^5.0.0",
+    "@capacitor/ios": "^5.0.0",
+    "@capacitor/splash-screen": "^5.0.0",
+    "@capacitor/status-bar": "^5.0.0"
+  },
+  "keywords": ["budget", "finance", "teen", "pwa"],
+  "author": "",
+  "license": "MIT"
+}

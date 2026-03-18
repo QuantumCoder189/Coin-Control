@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Coin Control — the teen budget app that makes managing money easy and visual." />
+  <title>Coin Control</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪙</text></svg>" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CoinControl" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="theme-color" content="#f5c842" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Confetti canvas — covers full screen, pointer-events:none so it doesn't block clicks -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- ===== ONBOARDING OVERLAY ===== -->
+  <div id="onboarding" class="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Welcome to Coin Control">
+    <div class="onboarding-card">
+      <div class="ob-dots" id="ob-dots">
+        <span class="ob-dot active"></span>
+        <span class="ob-dot"></span>
+        <span class="ob-dot"></span>
+        <span class="ob-dot"></span>
+      </div>
+      <div class="ob-steps">
+        <div class="ob-step active" data-step="0">
+          <div class="ob-emoji">🪙</div>
+          <h2 class="ob-title">Welcome to<br><strong>Coin Control</strong></h2>
+          <p class="ob-desc">Your money, your rules. Track spending, crush goals, and actually know where your cash goes.</p>
+        </div>
+        <div class="ob-step" data-step="1">
+          <div class="ob-emoji">📊</div>
+          <h2 class="ob-title">Track every dollar</h2>
+          <p class="ob-desc">Add income and expenses in seconds. See live charts of your spending by category.</p>
+        </div>
+        <div class="ob-step" data-step="2">
+          <div class="ob-emoji">🎯</div>
+          <h2 class="ob-title">Set savings goals</h2>
+          <p class="ob-desc">Saving for sneakers, a game, or a trip? Set a goal and watch your progress grow — confetti when you hit it! 🎉</p>
+        </div>
+        <div class="ob-step" data-step="3">
+          <div class="ob-emoji">🔔</div>
+          <h2 class="ob-title">Stay on budget</h2>
+          <p class="ob-desc">Get notified before you overspend. Enable alerts so Coin Control has your back.</p>
+          <button class="btn btn--primary ob-notify-btn" onclick="requestNotificationPermission()">Enable Budget Alerts</button>
+          <p class="ob-skip-notify" onclick="skipNotifications()">Skip for now</p>
+        </div>
+      </div>
+      <div class="ob-name-row" id="ob-name-row">
+        <input type="text" id="ob-name" class="input" placeholder="What's your name?" maxlength="20" />
+      </div>
+      <div class="ob-nav">
+        <button class="btn btn--ghost ob-back" id="ob-back" onclick="obPrev()" style="visibility:hidden">← Back</button>
+        <button class="btn btn--primary ob-next" id="ob-next" onclick="obNext()">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🪙</span>
+        <span class="logo-text">Coin<strong>Control</strong></span>
+      </div>
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
+        <button class="nav-tab" data-tab="expenses" role="tab" aria-selected="false">Expenses</button>
+        <button class="nav-tab" data-tab="goals" role="tab" aria-selected="false">Goals</button>
+        <button class="nav-tab" data-tab="split" role="tab" aria-selected="false">Split Bill</button>
+        <button class="nav-tab" data-tab="charts" role="tab" aria-selected="false">Charts</button>
+      </nav>
+      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark/light mode" title="Toggle theme">
+        <span id="theme-icon">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard" class="tab-section active" role="tabpanel">
+      <p class="greeting" id="greeting">Hey 👋 ready to take control?</p>
+
+      <div class="cards-grid">
+        <div class="card card--green">
+          <p class="card-label">Total Income</p>
+          <p class="card-value" id="display-income">$0.00</p>
+        </div>
+        <div class="card card--red">
+          <p class="card-label">Total Expenses</p>
+          <p class="card-value" id="display-expenses">$0.00</p>
+        </div>
+        <div class="card card--blue">
+          <p class="card-label">Balance</p>
+          <p class="card-value" id="display-balance">$0.00</p>
+        </div>
+      </div>
+
+      <div class="section-box" id="budget-status-box">
+        <div class="section-box-header">
+          <h2 class="section-title">Weekly Budget</h2>
+          <span class="badge" id="budget-badge">On track ✓</span>
+        </div>
+        <div class="budget-row">
+          <label class="field-label" for="input-weekly-budget">Set weekly limit ($)</label>
+          <div class="input-inline">
+            <input type="number" id="input-weekly-budget" class="input" placeholder="e.g. 80" min="0" />
+            <button class="btn btn--primary" onclick="saveWeeklyBudget()">Save</button>
+          </div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="weekly-progress" style="width: 0%;"></div>
+        </div>
+        <p class="progress-label" id="weekly-label">Set a weekly budget to track your spending.</p>
+      </div>
+
+      <div class="notif-banner" id="notif-banner" style="display:none;">
+        <span>🔔 Enable budget alerts so you know before you overspend</span>
+        <button class="btn btn--primary btn--sm" onclick="requestNotificationPermission()">Enable</button>
+        <button class="btn btn--ghost btn--sm" onclick="dismissNotifBanner()">✕</button>
+      </div>
+
+      <div class="section-box">
+        <h2 class="section-title">Add Income</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="field-label" for="input-income-name">Source</label>
+            <input type="text" id="input-income-name" class="input" placeholder="e.g. Weekly allowance" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="input-income-amount">Amount ($)</label>
+            <input type="number" id="input-income-amount" class="input" placeholder="0.00" min="0" step="0.01" />
+          </div>
+          <div class="form-group form-group--action">
+            <button class="btn btn--primary btn--full" onclick="addIncome()">+ Add Income</button>
+          </div>
+        </div>
+        <p class="error-msg" id="income-error"></p>
+      </div>
+
+      <div class="section-box">
+        <h2 class="section-title">Quick Add Expense</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="field-label" for="input-expense-name-d">Name</label>
+            <input type="text" id="input-expense-name-d" class="input" placeholder="e.g. Lunch" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="input-expense-amount-d">Amount ($)</label>
+            <input type="number" id="input-expense-amount-d" class="input" placeholder="0.00" min="0" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="input-expense-cat-d">Category</label>
+            <select id="input-expense-cat-d" class="input">
+              <option value="Food">🍔 Food</option>
+              <option value="Entertainment">🎮 Entertainment</option>
+              <option value="Transport">🚌 Transport</option>
+              <option value="Shopping">🛍️ Shopping</option>
+              <option value="Health">💊 Health</option>
+              <option value="Other">📦 Other</option>
+            </select>
+          </div>
+          <div class="form-group form-group--action">
+            <button class="btn btn--accent btn--full" onclick="addExpenseFrom('dashboard')">+ Add Expense</button>
+          </div>
+        </div>
+        <p class="error-msg" id="expense-error-d"></p>
+      </div>
+    </section>
+
+    <!-- TAB 2: EXPENSES -->
+    <section id="tab-expenses" class="tab-section" role="tabpanel">
+      <div class="section-box">
+        <h2 class="section-title">Add Expense</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="field-label" for="input-expense-name">Name</label>
+            <input type="text" id="input-expense-name" class="input" placeholder="e.g. Bus ticket" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="input-expense-amount">Amount ($)</label>
+            <input type="number" id="input-expense-amount" class="input" placeholder="0.00" min="0" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="input-expense-cat">Category</label>
+            <select id="input-expense-cat" class="input">
+              <option value="Food">🍔 Food</option>
+              <option value="Entertainment">🎮 Entertainment</option>
+              <option value="Transport">🚌 Transport</option>
+              <option value="Shopping">🛍️ Shopping</option>
+              <option value="Health">💊 Health</option>
+              <option value="Other">📦 Other</option>
+            </select>
+          </div>
+          <div class="form-group form-group--action">
+            <button class="btn btn--accent btn--full" onclick="addExpenseFrom('expenses')">+ Add</button>
+          </div>
+        </div>
+        <p class="error-msg" id="expense-error"></p>
+      </div>
+      <div class="section-box">
+        <div class="section-box-header">
+          <h2 class="section-title">All Expenses</h2>
+          <button class="btn btn--ghost btn--sm" onclick="clearAllExpenses()">Clear All</button>
+        </div>
+        <div id="expense-list" class="expense-list">
+          <p class="empty-state">No expenses yet. Add one above!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: GOALS -->
+    <section id="tab-goals" class="tab-section" role="tabpanel">
+      <div class="section-box">
+        <h2 class="section-title">New Savings Goal</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="field-label" for="input-goal-name">Goal Name</label>
+            <input type="text" id="input-goal-name" class="input" placeholder="e.g. New sneakers" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="input-goal-target">Target Amount ($)</label>
+            <input type="number" id="input-goal-target" class="input" placeholder="e.g. 150" min="1" step="0.01" />
+          </div>
+          <div class="form-group form-group--action">
+            <button class="btn btn--primary btn--full" onclick="addGoal()">+ Add Goal</button>
+          </div>
+        </div>
+        <p class="error-msg" id="goal-error"></p>
+      </div>
+      <div id="goals-list" class="goals-list">
+        <div class="section-box">
+          <p class="empty-state">No savings goals yet. Add one above!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: SPLIT BILL -->
+    <section id="tab-split" class="tab-section" role="tabpanel">
+      <div class="section-box">
+        <h2 class="section-title">Split Bill Calculator</h2>
+        <p class="section-desc">Splitting a bill with friends? Enter the total, number of people, and tip percentage.</p>
+        <div class="form-row split-form">
+          <div class="form-group">
+            <label class="field-label" for="split-total">Total Bill ($)</label>
+            <input type="number" id="split-total" class="input" placeholder="e.g. 64.00" min="0" step="0.01" oninput="calcSplit()" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="split-people">Number of People</label>
+            <input type="number" id="split-people" class="input" placeholder="e.g. 4" min="1" step="1" value="2" oninput="calcSplit()" />
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="split-tip">Tip (%)</label>
+            <input type="number" id="split-tip" class="input" placeholder="e.g. 10" min="0" step="1" value="0" oninput="calcSplit()" />
+          </div>
+        </div>
+        <div class="tip-quick">
+          <span class="field-label">Quick tip:</span>
+          <button class="tip-btn" onclick="setTip(0)">No tip</button>
+          <button class="tip-btn" onclick="setTip(10)">10%</button>
+          <button class="tip-btn" onclick="setTip(15)">15%</button>
+          <button class="tip-btn" onclick="setTip(20)">20%</button>
+        </div>
+        <div class="split-result" id="split-result" style="display:none;">
+          <div class="split-result-grid">
+            <div class="split-result-item">
+              <p class="split-result-label">Total with tip</p>
+              <p class="split-result-value" id="split-total-tip">$0.00</p>
+            </div>
+            <div class="split-result-item split-result-item--accent">
+              <p class="split-result-label">Each person pays</p>
+              <p class="split-result-value" id="split-per-person">$0.00</p>
+            </div>
+            <div class="split-result-item">
+              <p class="split-result-label">Tip per person</p>
+              <p class="split-result-value" id="split-tip-pp">$0.00</p>
+            </div>
+          </div>
+          <button class="btn btn--accent" style="margin-top:1rem;" onclick="addSplitAsExpense()">Add my share as an expense →</button>
+        </div>
+      </div>
+
+      <div class="section-box" id="split-names-box" style="display:none;">
+        <h2 class="section-title">Who's splitting?</h2>
+        <p class="section-desc">Track who's paid and who still owes.</p>
+        <div class="split-name-row">
+          <input type="text" id="split-name-input" class="input" placeholder="Friend's name" />
+          <button class="btn btn--primary btn--sm" onclick="addSplitPerson()">+ Add</button>
+        </div>
+        <div id="split-people-list" class="split-people-list"></div>
+      </div>
+    </section>
+
+    <!-- TAB 5: CHARTS -->
+    <section id="tab-charts" class="tab-section" role="tabpanel">
+      <div class="charts-grid">
+        <div class="section-box">
+          <h2 class="section-title">Spending by Category</h2>
+          <div class="chart-wrap">
+            <canvas id="pie-chart" aria-label="Pie chart of spending by category"></canvas>
+          </div>
+          <div id="pie-legend" class="chart-legend"></div>
+        </div>
+        <div class="section-box">
+          <h2 class="section-title">Income vs Expenses</h2>
+          <div class="chart-wrap chart-wrap--bar">
+            <canvas id="bar-chart" aria-label="Bar chart of income versus expenses"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Coin Control — made for teens who want to own their money 💸</p>
+  </footer>
+
+  <div id="offline-banner" class="offline-banner" style="display:none;">
+    📴 You're offline — data is saved locally
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('[SW] Registered:', reg.scope))
+          .catch(err => console.warn('[SW] Failed:', err));
+      });
+    }
+    const offlineBanner = document.getElementById('offline-banner');
+    window.addEventListener('offline', () => { offlineBanner.style.display = 'block'; });
+    window.addEventListener('online',  () => { offlineBanner.style.display = 'none'; });
+    if (!navigator.onLine) offlineBanner.style.display = 'block';
+  </script>
+
+</body>
+</html>
